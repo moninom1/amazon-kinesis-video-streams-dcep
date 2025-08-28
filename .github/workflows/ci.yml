@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone This Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build and Run Tests
@@ -30,11 +30,11 @@ jobs:
           functions-coverage-min: 100
           line-coverage-min: 100
 
-  endianness-test:
+  docker-endianness-test:
     runs-on: ubuntu-latest
     steps:
       - name: Clone This Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Set up QEMU

@@ -7,8 +7,8 @@ services:
       dockerfile: docker/little-endian/Dockerfile
     platform: linux/amd64
     volumes:
-      - ../build-le:/workspace/build
-      - ../coverage-le:/workspace/coverage
+      - ../out/build-le:/workspace/build
+      - ../out/coverage-le:/workspace/coverage
     environment:
       - ENDIAN_TYPE=little
 
@@ -18,7 +18,7 @@ services:
       dockerfile: docker/big-endian/Dockerfile
     platform: linux/s390x
     volumes:
-      - ../build-be:/workspace/build
-      - ../coverage-be:/workspace/coverage
+      - ../out/build-be:/workspace/build
+      - ../out/coverage-be:/workspace/coverage
     environment:
       - ENDIAN_TYPE=big
