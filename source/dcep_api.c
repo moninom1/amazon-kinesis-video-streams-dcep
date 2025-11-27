@@ -126,7 +126,11 @@ DcepResult_t Dcep_SerializeChannelOpenMessage( DcepContext_t * pCtx,
     {
         if( pChannelOpenMessage->channelNameLength > 0 )
         {
-            if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->channelNameLength ) )
+            if( pChannelOpenMessage->pChannelName == NULL )
+            {
+                result = DCEP_RESULT_BAD_PARAM;
+            }
+            else if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->channelNameLength ) )
             {
                 result = DCEP_RESULT_OUT_OF_MEMORY;
             }
@@ -145,7 +149,11 @@ DcepResult_t Dcep_SerializeChannelOpenMessage( DcepContext_t * pCtx,
     {
         if( pChannelOpenMessage->protocolLength > 0 )
         {
-            if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->protocolLength ) )
+            if( pChannelOpenMessage->pProtocol == NULL )
+            {
+                result = DCEP_RESULT_BAD_PARAM;
+            }
+            else if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->protocolLength ) )
             {
                 result = DCEP_RESULT_OUT_OF_MEMORY;
             }
@@ -223,6 +231,15 @@ DcepResult_t Dcep_DeserializeChannelOpenMessage( DcepContext_t * pCtx,
         pChannelOpenMessage->channelNameLength = DCEP_READ_UINT16( &( pDcepMessage[ DCEP_LABEL_LENGTH_OFFSET ] ) );
         pChannelOpenMessage->protocolLength = DCEP_READ_UINT16( &( pDcepMessage[ DCEP_PROTOCOL_LENGTH_OFFSET ] ) );
 
+        /* Validate total message length */
+        if( dcepMessageLength < DCEP_HEADER_LENGTH + pChannelOpenMessage->channelNameLength + pChannelOpenMessage->protocolLength )
+        {
+            result = DCEP_RESULT_MALFORMED_MESSAGE;
+        }
+    }
+
+    if( result == DCEP_RESULT_OK )
+    {
         consumedLength += DCEP_HEADER_LENGTH;
 
         if( ( pChannelOpenMessage->channelType == DCEP_DATA_CHANNEL_PARTIAL_RELIABLE_REXMIT ) ||
