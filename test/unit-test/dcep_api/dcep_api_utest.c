@@ -506,6 +506,48 @@ void test_dcepSerializeChannelOpenMessage_OutOfMemory_Protocol( void )
 
 /*-----------------------------------------------------------*/
 
+/**
+ * @brief Validate Dcep_SerializeChannelOpenMessage with null pointers but non-zero lengths.
+ */
+void test_dcepSerializeChannelOpenMessage_NullPointers( void )
+{
+    DcepResult_t result;
+    DcepContext_t ctx;
+    DcepChannelOpenMessage_t channelOpenMessage = { 0 };
+    size_t bufferLength = MAX_BUFFER_LENGTH;
+
+    result = Dcep_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+
+    /* Test NULL channel name pointer with non-zero length. */
+    channelOpenMessage.channelType = DCEP_DATA_CHANNEL_RELIABLE;
+    channelOpenMessage.priority = 0x1234;
+    channelOpenMessage.pChannelName = NULL;
+    channelOpenMessage.channelNameLength = 5;
+    channelOpenMessage.pProtocol = NULL;
+    channelOpenMessage.protocolLength = 0;
+
+    result = Dcep_SerializeChannelOpenMessage( &( ctx ),
+                                               &( channelOpenMessage ),
+                                               &( testBuffer[ 0 ] ),
+                                               &( bufferLength ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_BAD_PARAM, result );
+
+    /* Test NULL protocol pointer with non-zero length. */
+    channelOpenMessage.pChannelName = NULL;
+    channelOpenMessage.channelNameLength = 0;
+    channelOpenMessage.pProtocol = NULL;
+    channelOpenMessage.protocolLength = 3;
+
+    result = Dcep_SerializeChannelOpenMessage( &( ctx ),
+                                               &( channelOpenMessage ),
+                                               &( testBuffer[ 0 ] ),
+                                               &( bufferLength ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_BAD_PARAM, result );
+}
+
+/*-----------------------------------------------------------*/
+
 /* ==============================  Test Cases for Channel Ack Message Serialization ============================== */
 
 /**
@@ -978,6 +1020,73 @@ void test_dcepDeserializeChannelOpenMessage_MalformedMessage_Protocol( void )
 
 /*-----------------------------------------------------------*/
 
+/**
+ * @brief Validate Dcep_DeserializeChannelOpenMessage with insufficient buffer length.
+ */
+void test_dcepDeserializeChannelOpenMessage_InsufficientBufferLength( void )
+{
+    DcepResult_t result;
+    DcepContext_t ctx;
+    DcepChannelOpenMessage_t deserializedMessage = { 0 };
+    uint8_t malformedMessage[] =
+    {
+        DCEP_MESSAGE_DATA_CHANNEL_OPEN, /* Message Type: 0x03. */
+        DCEP_DATA_CHANNEL_RELIABLE,     /* Channel Type: 0x00. */
+        0x12, 0x34,                     /* Priority: 0x1234. */
+        0x00, 0x00, 0x00, 0x00,         /* Reliability parameter: 0. */
+        0x00, 0x64,                     /* Channel name length: 100. */
+        0x00, 0x64,                     /* Protocol length: 100. */
+        /* Only header, no actual data for claimed lengths */
+    };
+    size_t malformedMessageLength = sizeof( malformedMessage ); /* Only 12 bytes, but claims 200 bytes of data */
+
+    result = Dcep_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+
+    /* Message claims 100+100=200 bytes of data but only provides 12 bytes total */
+    result = Dcep_DeserializeChannelOpenMessage( &( ctx ),
+                                                 &( malformedMessage[ 0 ] ),
+                                                 malformedMessageLength,
+                                                 &( deserializedMessage ) );
+
+    TEST_ASSERT_EQUAL( DCEP_RESULT_MALFORMED_MESSAGE, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test channel name length validation - insufficient message length for channel name.
+ */
+void test_dcepDeserializeChannelOpenMessage_InsufficientChannelNameLength( void )
+{
+    DcepResult_t result;
+    DcepContext_t ctx;
+    DcepChannelOpenMessage_t deserializedMessage = { 0 };
+    uint8_t serializedMessage[] =
+    {
+        DCEP_MESSAGE_DATA_CHANNEL_OPEN, /* Message Type: 0x03. */
+        DCEP_DATA_CHANNEL_RELIABLE,     /* Channel Type: 0x00. */
+        0x12, 0x34,                     /* Priority: 0x1234. */
+        0x00, 0x00, 0x00, 0x00,         /* Reliability parameter: 0. */
+        0x00, 0x05,                     /* Channel name length: 5. */
+        0x00, 0x00,                     /* Protocol length: 0. */
+        't','e','s'                     /* Only 3 bytes instead of 5. */
+    };
+    size_t serializedMessageLength = sizeof( serializedMessage );
+
+    result = Dcep_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+
+    result = Dcep_DeserializeChannelOpenMessage( &( ctx ),
+                                                 &( serializedMessage[ 0 ] ),
+                                                 serializedMessageLength,
+                                                 &( deserializedMessage ) );
+
+    TEST_ASSERT_EQUAL( DCEP_RESULT_MALFORMED_MESSAGE, result );
+}
+
+/*-----------------------------------------------------------*/
+
 /* ==============================  Test Cases for Message Type Detection ============================== */
 
 /**
@@ -1307,6 +1416,139 @@ void test_dcepRoundTrip_PartialReliableRetransmit( void )
     TEST_ASSERT_EQUAL( original.protocolLength, deserialized.protocolLength );
     TEST_ASSERT_EQUAL_UINT8_ARRAY( original.pChannelName, deserialized.pChannelName, original.channelNameLength );
     TEST_ASSERT_EQUAL_UINT8_ARRAY( original.pProtocol, deserialized.pProtocol, original.protocolLength );
+}
+
+/*-----------------------------------------------------------*/
+/**
+ * @brief Test channel name length validation - exact boundary case.
+ */
+void test_dcepDeserializeChannelOpenMessage_ChannelNameLength_ExactBoundary( void )
+{
+    DcepResult_t result;
+    DcepContext_t ctx;
+    DcepChannelOpenMessage_t deserializedMessage = { 0 };
+    uint8_t serializedMessage[] =
+    {
+        DCEP_MESSAGE_DATA_CHANNEL_OPEN, /* Message Type: 0x03. */
+        DCEP_DATA_CHANNEL_RELIABLE,     /* Channel Type: 0x00. */
+        0x12, 0x34,                     /* Priority: 0x1234. */
+        0x00, 0x00, 0x00, 0x00,         /* Reliability parameter: 0. */
+        0x00, 0x04,                     /* Channel name length: 4. */
+        0x00, 0x00,                     /* Protocol length: 0. */
+        't','e','s','t'                 /* Exactly 4 bytes for channel name. */
+    };
+    size_t serializedMessageLength = sizeof( serializedMessage );
+
+    result = Dcep_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+
+    result = Dcep_DeserializeChannelOpenMessage( &( ctx ),
+                                                 &( serializedMessage[ 0 ] ),
+                                                 serializedMessageLength,
+                                                 &( deserializedMessage ) );
+
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+    TEST_ASSERT_EQUAL( 4, deserializedMessage.channelNameLength );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test channel name length validation - one byte short.
+ */
+void test_dcepDeserializeChannelOpenMessage_ChannelNameLength_OneByteLess( void )
+{
+    DcepResult_t result;
+    DcepContext_t ctx;
+    DcepChannelOpenMessage_t deserializedMessage = { 0 };
+    uint8_t serializedMessage[] =
+    {
+        DCEP_MESSAGE_DATA_CHANNEL_OPEN, /* Message Type: 0x03. */
+        DCEP_DATA_CHANNEL_RELIABLE,     /* Channel Type: 0x00. */
+        0x12, 0x34,                     /* Priority: 0x1234. */
+        0x00, 0x00, 0x00, 0x00,         /* Reliability parameter: 0. */
+        0x00, 0x04,                     /* Channel name length: 4. */
+        0x00, 0x00,                     /* Protocol length: 0. */
+        't','e','s'                     /* Only 3 bytes instead of 4. */
+    };
+    size_t serializedMessageLength = sizeof( serializedMessage );
+
+    result = Dcep_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+
+    result = Dcep_DeserializeChannelOpenMessage( &( ctx ),
+                                                 &( serializedMessage[ 0 ] ),
+                                                 serializedMessageLength,
+                                                 &( deserializedMessage ) );
+
+    TEST_ASSERT_EQUAL( DCEP_RESULT_MALFORMED_MESSAGE, result );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test channel name length validation - zero length claimed but message too short.
+ */
+void test_dcepDeserializeChannelOpenMessage_ChannelNameLength_ZeroLengthValid( void )
+{
+    DcepResult_t result;
+    DcepContext_t ctx;
+    DcepChannelOpenMessage_t deserializedMessage = { 0 };
+    uint8_t serializedMessage[] =
+    {
+        DCEP_MESSAGE_DATA_CHANNEL_OPEN, /* Message Type: 0x03. */
+        DCEP_DATA_CHANNEL_RELIABLE,     /* Channel Type: 0x00. */
+        0x12, 0x34,                     /* Priority: 0x1234. */
+        0x00, 0x00, 0x00, 0x00,         /* Reliability parameter: 0. */
+        0x00, 0x00,                     /* Channel name length: 0. */
+        0x00, 0x00                      /* Protocol length: 0. */
+    };
+    size_t serializedMessageLength = sizeof( serializedMessage );
+
+    result = Dcep_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+
+    result = Dcep_DeserializeChannelOpenMessage( &( ctx ),
+                                                 &( serializedMessage[ 0 ] ),
+                                                 serializedMessageLength,
+                                                 &( deserializedMessage ) );
+
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+    TEST_ASSERT_EQUAL( 0, deserializedMessage.channelNameLength );
+    TEST_ASSERT_NULL( deserializedMessage.pChannelName );
+}
+
+/*-----------------------------------------------------------*/
+
+/**
+ * @brief Test channel name length validation - large length value causing overflow.
+ */
+void test_dcepDeserializeChannelOpenMessage_ChannelNameLength_LargeValue( void )
+{
+    DcepResult_t result;
+    DcepContext_t ctx;
+    DcepChannelOpenMessage_t deserializedMessage = { 0 };
+    uint8_t serializedMessage[] =
+    {
+        DCEP_MESSAGE_DATA_CHANNEL_OPEN, /* Message Type: 0x03. */
+        DCEP_DATA_CHANNEL_RELIABLE,     /* Channel Type: 0x00. */
+        0x12, 0x34,                     /* Priority: 0x1234. */
+        0x00, 0x00, 0x00, 0x00,         /* Reliability parameter: 0. */
+        0xFF, 0xFF,                     /* Channel name length: 65535. */
+        0x00, 0x00,                     /* Protocol length: 0. */
+        't','e','s','t'                 /* Only 4 bytes available. */
+    };
+    size_t serializedMessageLength = sizeof( serializedMessage );
+
+    result = Dcep_Init( &( ctx ) );
+    TEST_ASSERT_EQUAL( DCEP_RESULT_OK, result );
+
+    result = Dcep_DeserializeChannelOpenMessage( &( ctx ),
+                                                 &( serializedMessage[ 0 ] ),
+                                                 serializedMessageLength,
+                                                 &( deserializedMessage ) );
+
+    TEST_ASSERT_EQUAL( DCEP_RESULT_MALFORMED_MESSAGE, result );
 }
 
 /*-----------------------------------------------------------*/
