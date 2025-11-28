@@ -82,7 +82,9 @@ DcepResult_t Dcep_SerializeChannelOpenMessage( DcepContext_t * pCtx,
         ( pChannelOpenMessage == NULL ) ||
         ( pBuffer == NULL ) ||
         ( pBufferLength == NULL ) ||
-        ( *pBufferLength < DCEP_HEADER_LENGTH ) )
+        ( *pBufferLength < DCEP_HEADER_LENGTH ) ||
+        ( ( pChannelOpenMessage->channelNameLength > 0 ) && ( pChannelOpenMessage->pChannelName == NULL ) ) ||
+        ( ( pChannelOpenMessage->protocolLength > 0 ) && ( pChannelOpenMessage->pProtocol == NULL ) ) )
     {
         result = DCEP_RESULT_BAD_PARAM;
     }
@@ -126,11 +128,7 @@ DcepResult_t Dcep_SerializeChannelOpenMessage( DcepContext_t * pCtx,
     {
         if( pChannelOpenMessage->channelNameLength > 0 )
         {
-            if( pChannelOpenMessage->pChannelName == NULL )
-            {
-                result = DCEP_RESULT_BAD_PARAM;
-            }
-            else if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->channelNameLength ) )
+            if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->channelNameLength ) )
             {
                 result = DCEP_RESULT_OUT_OF_MEMORY;
             }
@@ -149,11 +147,7 @@ DcepResult_t Dcep_SerializeChannelOpenMessage( DcepContext_t * pCtx,
     {
         if( pChannelOpenMessage->protocolLength > 0 )
         {
-            if( pChannelOpenMessage->pProtocol == NULL )
-            {
-                result = DCEP_RESULT_BAD_PARAM;
-            }
-            else if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->protocolLength ) )
+            if( *pBufferLength < ( serializedMessageLength + pChannelOpenMessage->protocolLength ) )
             {
                 result = DCEP_RESULT_OUT_OF_MEMORY;
             }
